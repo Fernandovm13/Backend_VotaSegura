@@ -1,6 +1,6 @@
 # VotaSegura — Backend API
 
-> **© 2026 Fernando Velázquez Méndez. Todos los derechos reservados.**  
+> **© 2026 Fernando Vélez Méndez. Todos los derechos reservados.**  
 > Este proyecto es de autoría propia. Queda prohibida su copia, distribución o uso comercial sin autorización expresa del autor.
 
 ---
@@ -112,7 +112,7 @@ npx cloudflared tunnel --protocol http2 --url http://localhost:8080
 
 ## Autor
 
-**Fernando Velázquez Méndez**  
+**Fernando Vélez Méndez**  
 Desarrollador Full Stack  
 © 2026 — Todos los derechos reservados.
 
