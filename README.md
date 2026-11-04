@@ -1,7 +1,7 @@
 # VotaSegura — Backend API
 
 > **© 2026 Fernando Vélez Méndez. Todos los derechos reservados.**  
-> Este proyecto es de autoría propia. Queda prohibida su copia, distribución o uso comercial sin autorización expresa del autor.
+> Este proyecto se comparte públicamente con fines de portafolio y referencia académica. El código fuente puede ser consultado y estudiado libremente, pero queda prohibido su uso comercial, redistribución o presentación como obra propia sin autorización expresa del autor.
 
 ---
 
@@ -104,9 +104,40 @@ src/main/java/com/votasegura/api/
 
 ## Exposición a Internet (Cloudflare Tunnel)
 
+VotaSegura utiliza **Cloudflare Tunnel** para exponer el servidor local a internet de forma segura, sin necesidad de abrir puertos en el router ni contratar un servidor en la nube. El backend corre en tu computadora pero es accesible desde cualquier dispositivo en el mundo.
+
+### ¿Cómo funciona?
+Cloudflare actúa como intermediario: recibe las peticiones de internet y las redirige a tu servidor local a través de una conexión cifrada saliente. Tu IP real nunca queda expuesta.
+
+### Iniciar el túnel del backend
+
 ```bash
 npx cloudflared tunnel --protocol http2 --url http://localhost:8080
 ```
+
+Cuando el túnel inicie correctamente verás algo así en la terminal:
+
+```
++--------------------------------------------------------------------------------------------+
+|  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+|  https://nombre-aleatorio-ejemplo.trycloudflare.com                                        |
++--------------------------------------------------------------------------------------------+
+```
+
+### Actualizar el frontend con la nueva URL
+
+Copia la URL generada y actualiza el archivo `.env.local` del frontend agregando `/api/v1` al final:
+
+```env
+NEXT_PUBLIC_API_URL=https://nombre-aleatorio-ejemplo.trycloudflare.com/api/v1
+```
+
+> ⚠️ Cada vez que reinicies el túnel se genera una URL diferente. Deberás actualizar `.env.local` y reiniciar el frontend.
+
+### Consideraciones
+- El túnel **funciona mientras la computadora esté encendida** y el proceso activo.
+- No requiere cuenta de Cloudflare para pruebas (quick tunnel gratuito).
+- Para producción real se recomienda un túnel nombrado con cuenta de Cloudflare o un servidor dedicado (Railway, Render, etc.).
 
 ---
 
