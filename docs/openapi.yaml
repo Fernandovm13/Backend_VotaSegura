@@ -1,0 +1,1978 @@
+openapi: 3.0.1
+info:
+  title: API REST VotaSegura
+  description: Documentación interactiva de endpoints RESTful para la plataforma de
+    votaciones VotaSegura
+  contact:
+    name: Equipo VotaSegura
+    email: soporte@votasegura.com
+  version: 1.0.0
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+security:
+- bearerAuth: []
+tags:
+- name: Elecciones
+  description: Gestión de elecciones, candidatos, emisión de voto anónimo y consulta
+    de resultados
+- name: Grupos
+  description: Creación, consulta, actualización, eliminación de grupos y gestión
+    de miembros
+- name: Autenticación
+  description: Endpoints de inicio de sesión, cierre de sesión, renovación de token
+    y gestión de contraseñas
+- name: Usuarios
+  description: Registro de cuenta, consulta y actualización de perfil, historial de
+    votos y desactivación de cuenta
+- name: OTP - Verificación
+  description: Solicitud y verificación de códigos de un solo uso (OTP) para verificación
+    de cuenta, 2FA y recuperación de contraseña
+- name: Biometría WebAuthn / FIDO2
+  description: Registro y autenticación biométrica usando el estándar W3C WebAuthn
+    con soporte para huella digital y Face ID
+paths:
+  /api/v1/usuarios/perfil:
+    get:
+      tags:
+      - Usuarios
+      summary: Consultar perfil del usuario autenticado
+      description: Retorna los datos del perfil del usuario identificado por el token
+        JWT.
+      operationId: perfil
+      responses:
+        '200':
+          description: Perfil obtenido correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PerfilResponse'
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Usuarios
+      summary: Actualizar perfil
+      description: Modifica el nombre u otros datos del perfil del usuario autenticado.
+      operationId: actualizarPerfil
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarPerfilRequest'
+        required: true
+      responses:
+        '400':
+          description: Datos de entrada inválidos
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Perfil actualizado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PerfilResponse'
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Usuarios
+      summary: Desactivar cuenta
+      description: Pone la cuenta del usuario autenticado en estado 'inactivo'. La
+        acción es reversible solo por un administrador.
+      operationId: desactivarCuenta
+      responses:
+        '200':
+          description: Cuenta desactivada correctamente
+          content:
+            '*/*':
+              schema:
+                type: string
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/grupos/{grupoId}:
+    get:
+      tags:
+      - Grupos
+      summary: Obtener detalle de un grupo
+      description: Retorna la información completa de un grupo específico. El usuario
+        debe ser miembro.
+      operationId: obtenerGrupo
+      parameters:
+      - name: grupoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '403':
+          description: El usuario no es miembro del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Detalle del grupo obtenido
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/GrupoResponse'
+        '404':
+          description: Grupo no encontrado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Grupos
+      summary: Actualizar un grupo
+      description: Modifica el nombre o descripción de un grupo existente. Solo el
+        administrador del grupo puede ejecutar esta acción.
+      operationId: actualizarGrupo
+      parameters:
+      - name: grupoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearGrupoRequest'
+        required: true
+      responses:
+        '200':
+          description: Grupo actualizado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/GrupoResponse'
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Grupos
+      summary: Eliminar un grupo
+      description: Elimina permanentemente el grupo, todas sus elecciones, candidatos
+        y registros de votos.
+      operationId: eliminarGrupo
+      parameters:
+      - name: grupoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Grupo eliminado correctamente
+          content:
+            '*/*':
+              schema:
+                type: string
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/elecciones/{eleccionId}:
+    get:
+      tags:
+      - Elecciones
+      summary: Obtener detalle de una elección
+      description: Retorna la información completa de la elección con su lista de
+        candidatos e indica si el usuario ya votó.
+      operationId: obtenerEleccion
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '403':
+          description: El usuario no es miembro del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Elección no encontrada
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Detalle de la elección obtenido
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/EleccionResponse'
+      security:
+      - bearerAuth: []
+    put:
+      tags:
+      - Elecciones
+      summary: Actualizar una elección
+      description: Modifica el título, descripción o fecha de fin de una elección.
+        Solo el administrador del grupo puede ejecutar esta acción.
+      operationId: actualizarEleccion
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearEleccionRequest'
+        required: true
+      responses:
+        '200':
+          description: Elección actualizada correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/EleccionResponse'
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Elecciones
+      summary: Eliminar una elección
+      description: Elimina permanentemente la elección junto con todos sus candidatos
+        y registros de votos.
+      operationId: eliminarEleccion
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Elección eliminada correctamente
+          content:
+            '*/*':
+              schema:
+                type: string
+      security:
+      - bearerAuth: []
+  /api/v1/usuarios:
+    post:
+      tags:
+      - Usuarios
+      summary: Registrar nuevo usuario
+      description: Crea una cuenta nueva en el sistema. El correo queda en estado
+        pendiente hasta verificar el OTP.
+      operationId: registrar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroRequest'
+        required: true
+      responses:
+        '201':
+          description: Usuario registrado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '409':
+          description: El correo ya se encuentra registrado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '400':
+          description: Datos de entrada inválidos (formato de correo, contraseña débil,
+            etc.)
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/grupos:
+    get:
+      tags:
+      - Grupos
+      summary: Listar mis grupos
+      description: Retorna todos los grupos donde el usuario autenticado es miembro
+        o administrador.
+      operationId: listarMisGrupos
+      responses:
+        '200':
+          description: Lista de grupos obtenida correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/GrupoResponse'
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Grupos
+      summary: Crear un grupo
+      description: Crea un nuevo grupo de votación. Genera automáticamente un código
+        alfanumérico único de acceso.
+      operationId: crearGrupo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearGrupoRequest'
+        required: true
+      responses:
+        '400':
+          description: Nombre inválido o datos faltantes
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '201':
+          description: Grupo creado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/GrupoResponse'
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/grupos/{grupoId}/elecciones:
+    get:
+      tags:
+      - Grupos
+      summary: Listar elecciones del grupo
+      description: Retorna todas las elecciones (programadas, activas y cerradas)
+        pertenecientes al grupo.
+      operationId: listarEleccionesDeGrupo
+      parameters:
+      - name: grupoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '403':
+          description: El usuario no es miembro del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Lista de elecciones obtenida
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/EleccionResponse'
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Grupos
+      summary: Crear elección dentro de un grupo
+      description: Crea una nueva elección con candidatos dentro del grupo. Solo el
+        administrador del grupo puede ejecutar esta acción.
+      operationId: crearEleccion
+      parameters:
+      - name: grupoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearEleccionRequest'
+        required: true
+      responses:
+        '400':
+          description: Datos de entrada inválidos
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '201':
+          description: Elección creada correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/EleccionResponse'
+      security:
+      - bearerAuth: []
+  /api/v1/grupos/unirse:
+    post:
+      tags:
+      - Grupos
+      summary: Unirse a un grupo
+      description: 'Permite al usuario unirse a un grupo existente mediante su código
+        de acceso corto (ej: K7P-2QX).'
+      operationId: unirseAGrupo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnirseGrupoRequest'
+        required: true
+      responses:
+        '404':
+          description: Código de grupo no encontrado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Usuario unido al grupo correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/GrupoResponse'
+        '409':
+          description: El usuario ya es miembro del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/elecciones/{eleccionId}/votos:
+    post:
+      tags:
+      - Elecciones
+      summary: Emitir voto anónimo
+      description: Registra el voto del usuario de forma anónima. El sistema garantiza
+        que no existe ninguna relación directa entre el votante y el candidato elegido
+        en la base de datos.
+      operationId: emitirVoto
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmitirVotoRequest'
+        required: true
+      responses:
+        '403':
+          description: El usuario no es miembro del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: El usuario ya emitió su voto en esta elección (voto duplicado)
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '201':
+          description: Voto emitido correctamente. Se genera un código de recibo anónimo.
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VotoResponse'
+        '400':
+          description: La elección no está activa o los datos son inválidos
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/elecciones/{eleccionId}/candidatos:
+    post:
+      tags:
+      - Elecciones
+      summary: Agregar candidato a una elección
+      description: Añade un nuevo candidato a una elección existente. Solo el administrador
+        del grupo puede ejecutar esta acción.
+      operationId: agregarCandidato
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidatoItemRequest'
+        required: true
+      responses:
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '400':
+          description: Datos del candidato inválidos o nombre duplicado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '201':
+          description: Candidato agregado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CandidatoResponse'
+      security:
+      - bearerAuth: []
+  /api/v1/auth/token/renovar:
+    post:
+      tags:
+      - Autenticación
+      summary: Renovar token de acceso
+      description: Genera un nuevo par de tokens usando un Refresh Token válido y
+        no expirado.
+      operationId: renovarToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+        required: true
+      responses:
+        '401':
+          description: Refresh Token inválido o expirado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Tokens renovados correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/v1/auth/password/restablecer:
+    post:
+      tags:
+      - Autenticación
+      summary: Restablecer contraseña
+      description: Establece una nueva contraseña usando el token de recuperación
+        enviado por correo.
+      operationId: restablecerPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestablecerPasswordRequest'
+        required: true
+      responses:
+        '400':
+          description: Token inválido, expirado o contraseña débil
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Contraseña restablecida correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+  /api/v1/auth/password/recuperar:
+    post:
+      tags:
+      - Autenticación
+      summary: Solicitar recuperación de contraseña
+      description: Envía un enlace de restablecimiento al correo del usuario registrado.
+      operationId: recuperarPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecuperarPasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: Correo de recuperación enviado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        '400':
+          description: Correo no válido o no registrado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/auth/otp/verificar:
+    post:
+      tags:
+      - OTP - Verificación
+      summary: Verificar código OTP
+      description: Valida el código OTP recibido por el usuario. Si es correcto, activa
+        la cuenta o permite continuar el flujo según el propósito.
+      operationId: verificar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerificarRequest'
+        required: true
+      responses:
+        '200':
+          description: OTP verificado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/OtpVerificadoResponse'
+        '400':
+          description: Código OTP inválido, expirado o ya utilizado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/auth/otp/solicitar:
+    post:
+      tags:
+      - OTP - Verificación
+      summary: Solicitar código OTP
+      description: Genera y envía un código OTP de 6 dígitos al correo o teléfono
+        del usuario según el canal y propósito indicados.
+      operationId: solicitar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpSolicitarRequest'
+        required: true
+      responses:
+        '200':
+          description: OTP generado y enviado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/OtpResponse'
+        '429':
+          description: Demasiadas solicitudes de OTP. Límite de tasa excedido
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '400':
+          description: Canal o propósito inválido / correo no registrado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - Autenticación
+      summary: Cerrar sesión
+      description: Invalida el token de acceso actual registrándolo en la lista negra.
+      operationId: logout
+      parameters:
+      - name: Authorization
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      responses:
+        '401':
+          description: Token inválido o expirado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Sesión cerrada correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+      security:
+      - bearerAuth: []
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Autenticación
+      summary: Iniciar sesión
+      description: Autentica un usuario con correo y contraseña. Retorna tokens JWT
+        de acceso y refresco.
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '400':
+          description: Datos de entrada inválidos
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Autenticación exitosa
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Credenciales incorrectas
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '429':
+          description: Demasiados intentos. Límite de tasa excedido
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/auth/biometria/registro/desafio:
+    post:
+      tags:
+      - Biometría WebAuthn / FIDO2
+      summary: Generar desafío de registro biométrico
+      description: Genera un challenge criptográfico que el dispositivo del usuario
+        debe firmar con su clave privada del chip de seguridad (Secure Enclave / TPM)
+        para registrar la credencial biométrica.
+      operationId: desafioRegistro
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BiometriaDesafioRequest'
+        required: true
+      responses:
+        '200':
+          description: Desafío de registro generado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BiometriaDesafioResponse'
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/auth/biometria/registro/confirmar:
+    post:
+      tags:
+      - Biometría WebAuthn / FIDO2
+      summary: Confirmar y registrar clave pública biométrica
+      description: Registra la llave pública FIDO2 del dispositivo. La llave privada
+        nunca abandona el hardware del usuario.
+      operationId: confirmarRegistro
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BiometriaConfirmarRequest'
+        required: true
+      responses:
+        '201':
+          description: Credencial biométrica registrada correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CredencialRegistradaResponse'
+        '400':
+          description: Firma inválida o challenge expirado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/auth/biometria/login/validar:
+    post:
+      tags:
+      - Biometría WebAuthn / FIDO2
+      summary: Validar firma biométrica y otorgar acceso
+      description: Verifica la firma criptográfica del dispositivo contra la llave
+        pública almacenada. Si es válida, retorna tokens JWT de sesión sin necesidad
+        de contraseña.
+      operationId: validarFirma
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BiometriaLoginValidarRequest'
+        required: true
+      responses:
+        '401':
+          description: La firma no corresponde a la llave pública registrada
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Autenticación biométrica exitosa
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Firma inválida o challenge expirado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/auth/biometria/login/desafio:
+    post:
+      tags:
+      - Biometría WebAuthn / FIDO2
+      summary: Generar desafío de inicio de sesión biométrico
+      description: Genera un challenge criptográfico para que el autenticador del
+        dispositivo firme y demuestre posesión de la llave privada registrada.
+      operationId: desafioLogin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BiometriaLoginDesafioRequest'
+        required: true
+      responses:
+        '200':
+          description: Desafío de login generado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/BiometriaLoginDesafioResponse'
+        '404':
+          description: No se encontró credencial biométrica registrada para este usuario
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/archivos/subir:
+    post:
+      tags:
+      - archivo-controller
+      operationId: subirArchivo
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                archivo:
+                  type: string
+                  format: binary
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseArchivoResponse'
+  /api/v1/elecciones/{eleccionId}/estado:
+    patch:
+      tags:
+      - Elecciones
+      summary: Cambiar estado de una elección
+      description: Permite al administrador cambiar el estado manualmente a 'activa'
+        o 'cerrada'.
+      operationId: cambiarEstado
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambiarEstadoRequest'
+        required: true
+      responses:
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Estado cambiado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/EleccionResponse'
+      security:
+      - bearerAuth: []
+  /api/v1/usuarios/historial-votos:
+    get:
+      tags:
+      - Usuarios
+      summary: Historial de votos
+      description: Retorna el listado de elecciones en las que el usuario ya participó,
+        con su código de recibo anónimo.
+      operationId: historialVotos
+      responses:
+        '200':
+          description: Historial recuperado correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/HistorialVotoResponse'
+        '401':
+          description: Token de acceso inválido o ausente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/elecciones/{eleccionId}/resultados:
+    get:
+      tags:
+      - Elecciones
+      summary: Consultar resultados de una elección
+      description: Retorna el conteo total de votos por candidato y determina el ganador
+        o declara empate. Solo visible cuando la elección está cerrada.
+      operationId: obtenerResultados
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Resultados obtenidos correctamente
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ResultadosEleccionResponse'
+        '403':
+          description: El usuario no es miembro del grupo o la elección aún está activa
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/archivos/{nombreArchivo}:
+    get:
+      tags:
+      - archivo-controller
+      operationId: verArchivo
+      parameters:
+      - name: nombreArchivo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+    delete:
+      tags:
+      - archivo-controller
+      operationId: eliminarArchivo
+      parameters:
+      - name: nombreArchivo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ApiResponseString'
+  /api/v1/grupos/{grupoId}/miembros/{usuarioId}:
+    delete:
+      tags:
+      - Grupos
+      summary: Eliminar miembro del grupo
+      description: Expulsa a un miembro del grupo o permite al propio usuario salir.
+        Solo el administrador puede expulsar a otros.
+      operationId: eliminarMiembro
+      parameters:
+      - name: grupoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: usuarioId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Miembro removido correctamente
+          content:
+            '*/*':
+              schema:
+                type: string
+        '404':
+          description: Miembro no encontrado en el grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: Sin permisos para expulsar a este miembro
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+      security:
+      - bearerAuth: []
+  /api/v1/elecciones/{eleccionId}/candidatos/{candidatoId}:
+    delete:
+      tags:
+      - Elecciones
+      summary: Eliminar un candidato
+      description: Elimina un candidato específico de la elección. Solo el administrador
+        del grupo puede ejecutar esta acción.
+      operationId: eliminarCandidato
+      parameters:
+      - name: eleccionId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: candidatoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '404':
+          description: Candidato no encontrado
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: El usuario no es administrador del grupo
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '200':
+          description: Candidato eliminado correctamente
+          content:
+            '*/*':
+              schema:
+                type: string
+      security:
+      - bearerAuth: []
+components:
+  schemas:
+    ActualizarPerfilRequest:
+      required:
+      - nombreCompleto
+      type: object
+      properties:
+        nombreCompleto:
+          maxLength: 100
+          minLength: 2
+          type: string
+        telefono:
+          maxLength: 20
+          minLength: 0
+          type: string
+        avatarUrl:
+          type: string
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties:
+            type: object
+    PerfilResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador único del usuario (UUID)
+          example: usr-3d8f1a2b-4c7e
+        nombre:
+          type: string
+          description: Nombre completo del usuario
+          example: Ana García López
+        correo:
+          type: string
+          description: Correo electrónico del usuario
+          example: ana.garcia@correo.com
+        rol:
+          type: string
+          description: Rol del usuario en el sistema
+          example: VOTANTE
+          enum:
+          - VOTANTE
+          - ADMINISTRADOR
+          - VOTANTE
+          - ADMIN
+        estado:
+          type: string
+          description: Estado de la cuenta del usuario
+          example: ACTIVO
+          enum:
+          - ACTIVO
+          - INACTIVO
+        correoVerificado:
+          type: boolean
+          description: Indica si el correo electrónico fue verificado
+          example: true
+        biometriaRegistrada:
+          type: boolean
+          description: Indica si el usuario tiene biometría (WebAuthn/FIDO2) registrada
+          example: false
+        eleccionesDisponibles:
+          type: integer
+          description: Número de elecciones disponibles para votar actualmente
+          format: int32
+          example: 2
+        eleccionesVotadas:
+          type: integer
+          description: Número total de elecciones en las que ya votó
+          format: int32
+          example: 5
+        creadoEn:
+          type: string
+          description: Fecha y hora de creación de la cuenta
+          format: date-time
+        actualizadoEn:
+          type: string
+          description: Fecha y hora de la última actualización del perfil
+          format: date-time
+      description: Perfil completo del usuario autenticado
+    CrearGrupoRequest:
+      required:
+      - nombre
+      type: object
+      properties:
+        nombre:
+          maxLength: 120
+          minLength: 3
+          type: string
+          description: Nombre del grupo (entre 3 y 120 caracteres)
+          example: Consejo Estudiantil 2024
+        descripcion:
+          type: string
+          description: Descripción opcional del grupo y su propósito
+          example: Grupo para elecciones del consejo estudiantil universitario
+      description: Datos para crear un nuevo grupo de votación
+    GrupoResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador único del grupo (UUID)
+          example: grp-9f8e7d6c-5b4a
+        name:
+          type: string
+          description: Nombre del grupo
+          example: Consejo Estudiantil 2024
+        code:
+          type: string
+          description: Código único de invitación al grupo (6 caracteres alfanuméricos)
+          example: GRP4X2
+        description:
+          type: string
+          description: Descripción del grupo
+          example: Grupo para elecciones del consejo estudiantil
+        role:
+          type: string
+          description: Rol del usuario actual en el grupo
+          example: ADMIN
+          enum:
+          - ADMIN
+          - MIEMBRO
+        electionsCount:
+          type: integer
+          description: Número total de elecciones creadas en el grupo
+          format: int64
+          example: 3
+        membersCount:
+          type: integer
+          description: Número total de miembros en el grupo
+          format: int64
+          example: 120
+        creadoEn:
+          type: string
+          description: Fecha y hora de creación del grupo
+          format: date-time
+      description: Información de un grupo de votación
+    CandidatoItemRequest:
+      required:
+      - nombre
+      type: object
+      properties:
+        nombre:
+          type: string
+          description: Nombre completo del candidato
+          example: Carlos Ramírez
+        puesto:
+          type: string
+          description: Puesto o cargo al que aspira el candidato
+          example: Presidente
+        descripcion:
+          type: string
+          description: Descripción o propuesta del candidato
+          example: Candidato con 5 años de experiencia en gestión estudiantil
+        avatarUrl:
+          type: string
+          description: URL de la imagen/avatar del candidato
+          example: https://cdn.votasegura.com/avatars/carlos.jpg
+      description: Datos de un candidato dentro de una elección
+    CrearEleccionRequest:
+      required:
+      - titulo
+      type: object
+      properties:
+        titulo:
+          type: string
+          description: Título descriptivo de la elección
+          example: Elección de Presidente 2024
+        descripcion:
+          type: string
+          description: Descripción opcional de la elección y sus propósitos
+          example: Votación para elegir al presidente del consejo estudiantil
+        fechaInicio:
+          type: string
+          description: Fecha y hora de inicio de la elección (ISO 8601)
+          example: '2024-12-01T08:00:00'
+        fechaFin:
+          type: string
+          description: Fecha y hora de cierre de la elección (ISO 8601)
+          example: '2024-12-01T20:00:00'
+        candidatos:
+          type: array
+          description: Lista de candidatos que participan en la elección
+          items:
+            $ref: '#/components/schemas/CandidatoItemRequest'
+      description: Datos para crear una nueva elección dentro de un grupo
+    CandidatoResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador único del candidato (UUID)
+          example: cand-7f3a2b1c-9e4d
+        name:
+          type: string
+          description: Nombre completo del candidato
+          example: Carlos Ramírez
+        position:
+          type: string
+          description: Puesto o cargo al que aspira
+          example: Presidente
+        description:
+          type: string
+          description: Descripción o propuesta del candidato
+          example: Candidato con 5 años de experiencia en gestión estudiantil
+        avatarUrl:
+          type: string
+          description: URL del avatar o imagen del candidato
+          example: https://cdn.votasegura.com/avatars/carlos.jpg
+        votesCount:
+          type: integer
+          description: Número total de votos recibidos (visible solo después del cierre)
+          format: int64
+          example: 45
+        percentage:
+          type: number
+          description: Porcentaje de votos sobre el total emitido (visible solo después
+            del cierre)
+          format: double
+          example: 51.72
+      description: Información de un candidato en una elección
+    EleccionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador único de la elección (UUID)
+          example: elec-1a2b3c4d-5e6f
+        groupId:
+          type: string
+          description: Identificador del grupo al que pertenece la elección
+          example: grp-9f8e7d6c-5b4a
+        groupName:
+          type: string
+          description: Nombre del grupo al que pertenece la elección
+          example: Consejo Estudiantil 2024
+        title:
+          type: string
+          description: Título de la elección
+          example: Elección de Presidente 2024
+        description:
+          type: string
+          description: Descripción de la elección
+          example: Votación para elegir al presidente del consejo
+        status:
+          type: string
+          description: Estado actual de la elección
+          example: ACTIVA
+          enum:
+          - PENDIENTE
+          - ACTIVA
+          - CERRADA
+        hasVoted:
+          type: boolean
+          description: Indica si el usuario actual ya emitió su voto en esta elección
+          example: false
+        totalVoters:
+          type: integer
+          description: Total de votantes habilitados en el grupo
+          format: int64
+          example: 120
+        votesCast:
+          type: integer
+          description: Total de votos emitidos hasta el momento
+          format: int64
+          example: 87
+        startDate:
+          type: string
+          description: Fecha y hora de inicio de la elección (ISO 8601)
+          example: '2024-12-01T08:00:00'
+        endDate:
+          type: string
+          description: Fecha y hora de cierre de la elección (ISO 8601)
+          example: '2024-12-01T20:00:00'
+        candidates:
+          type: array
+          description: Lista de candidatos que participan en la elección
+          items:
+            $ref: '#/components/schemas/CandidatoResponse'
+      description: Información completa de una elección
+    RegistroRequest:
+      required:
+      - correo
+      - nombre
+      - password
+      type: object
+      properties:
+        nombre:
+          maxLength: 100
+          minLength: 2
+          type: string
+          description: Nombre completo del usuario
+          example: Ana García López
+        correo:
+          type: string
+          description: Correo electrónico único del usuario
+          example: ana.garcia@correo.com
+        password:
+          pattern: ^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]).{12,}$
+          type: string
+          description: 'Contraseña segura: mínimo 12 caracteres, una mayúscula, un
+            número y un carácter especial'
+          example: Segura@2024!
+        rol:
+          type: string
+          description: Rol asignado al usuario en el sistema
+          example: VOTANTE
+          default: VOTANTE
+          enum:
+          - VOTANTE
+          - ADMINISTRADOR
+          - VOTANTE
+          - ADMIN
+      description: Datos para registrar un nuevo usuario en el sistema
+    UsuarioResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        nombre:
+          type: string
+        correo:
+          type: string
+        rol:
+          type: string
+          enum:
+          - VOTANTE
+          - ADMINISTRADOR
+        estado:
+          type: string
+        correoVerificado:
+          type: boolean
+        biometriaRegistrada:
+          type: boolean
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    UnirseGrupoRequest:
+      required:
+      - codigo
+      type: object
+      properties:
+        codigo:
+          type: string
+    EmitirVotoRequest:
+      required:
+      - candidatoId
+      type: object
+      properties:
+        candidatoId:
+          type: string
+          description: Identificador único del candidato al que se emite el voto
+          example: cand-7f3a2b1c-9e4d
+      description: Datos para emitir un voto en una elección
+    VotoResponse:
+      type: object
+      properties:
+        receiptCode:
+          type: string
+          description: Código de recibo único del voto (para auditoría anónima)
+          example: REC-8A2F3C1D-7B6E
+        status:
+          type: string
+          description: Estado del voto registrado
+          example: REGISTRADO
+          enum:
+          - REGISTRADO
+          - PENDIENTE
+        fecha:
+          type: string
+          description: Fecha y hora en que se emitió el voto
+          format: date-time
+        electionTitle:
+          type: string
+          description: Título de la elección en la que se votó
+          example: Elección de Presidente 2024
+        groupName:
+          type: string
+          description: Nombre del grupo donde se realizó la elección
+          example: Consejo Estudiantil 2024
+        mensaje:
+          type: string
+          description: Mensaje informativo para el usuario sobre su voto
+          example: Tu voto ha sido registrado exitosamente. Guarda tu código de recibo.
+      description: Comprobante de voto emitido (anónimo, sin referencia al candidato
+        elegido)
+    RefreshTokenRequest:
+      required:
+      - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: Token de acceso JWT (Bearer)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          description: Token de refresco para renovar el acceso sin re-autenticarse
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        tokenType:
+          type: string
+          description: Tipo de token, siempre 'Bearer'
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Tiempo de expiración del access token en segundos
+          format: int64
+          example: 900
+        usuario:
+          $ref: '#/components/schemas/UsuarioInfo'
+      description: Respuesta de autenticación con tokens JWT e información del usuario
+    UsuarioInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Identificador único del usuario (UUID)
+          example: usr-3d8f1a2b-4c7e
+        nombre:
+          type: string
+          description: Nombre completo del usuario
+          example: Ana García López
+        correo:
+          type: string
+          description: Correo electrónico del usuario
+          example: ana.garcia@correo.com
+        rol:
+          type: string
+          description: Rol del usuario en el sistema
+          example: VOTANTE
+          enum:
+          - VOTANTE
+          - ADMINISTRADOR
+          - VOTANTE
+          - ADMIN
+      description: Información resumida del usuario autenticado
+    RestablecerPasswordRequest:
+      required:
+      - nuevaPassword
+      - resetToken
+      type: object
+      properties:
+        resetToken:
+          type: string
+        nuevaPassword:
+          pattern: ^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]).{12,}$
+          type: string
+    MensajeResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+        invalidadoEn:
+          type: string
+          format: date-time
+    RecuperarPasswordRequest:
+      required:
+      - correo
+      type: object
+      properties:
+        correo:
+          type: string
+    OtpVerificarRequest:
+      required:
+      - codigo
+      - otpId
+      type: object
+      properties:
+        otpId:
+          type: string
+          description: Identificador único del OTP a verificar (retornado al solicitar)
+          example: otp-5a3f2c1d-8e6b
+        codigo:
+          pattern: ^[0-9]{6}$
+          type: string
+          description: Código OTP de 6 dígitos numéricos recibido por el usuario
+          example: '482913'
+      description: Datos para verificar un código OTP previamente enviado
+    OtpVerificadoResponse:
+      type: object
+      properties:
+        verificado:
+          type: boolean
+        verificationToken:
+          type: string
+        expiraEn:
+          type: integer
+          format: int32
+    OtpSolicitarRequest:
+      required:
+      - canal
+      - proposito
+      type: object
+      properties:
+        correo:
+          type: string
+          description: Correo electrónico destino (requerido si canal=correo)
+          example: usuario@correo.com
+        telefono:
+          type: string
+          description: Número de teléfono destino (requerido si canal=sms)
+          example: '+525512345678'
+        canal:
+          pattern: ^(correo|sms)$
+          type: string
+          description: Canal de entrega del OTP
+          example: correo
+          enum:
+          - correo
+          - sms
+        proposito:
+          pattern: ^(verificacion_cuenta|segundo_factor|confirmacion_voto|recuperacion_password)$
+          type: string
+          description: Propósito del OTP solicitado
+          example: segundo_factor
+          enum:
+          - verificacion_cuenta
+          - segundo_factor
+          - confirmacion_voto
+          - recuperacion_password
+      description: Datos para solicitar el envío de un código OTP
+    OtpResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+          description: Mensaje informativo del resultado de la solicitud
+          example: Código OTP enviado exitosamente al correo registrado
+        otpId:
+          type: string
+          description: Identificador único del OTP generado (necesario para la verificación)
+          example: otp-5a3f2c1d-8e6b
+        canal:
+          type: string
+          description: Canal por el que se envió el OTP
+          example: correo
+          enum:
+          - correo
+          - sms
+        expiraEn:
+          type: integer
+          description: Tiempo de expiración del OTP en segundos
+          format: int32
+          example: 300
+      description: Respuesta al solicitar el envío de un código OTP
+    LogoutRequest:
+      required:
+      - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          type: string
+    LoginRequest:
+      required:
+      - correo
+      - password
+      type: object
+      properties:
+        correo:
+          type: string
+          description: Correo electrónico registrado del usuario
+          example: usuario@correo.com
+        password:
+          type: string
+          description: Contraseña del usuario (mínimo 12 caracteres)
+          example: MiPass@2024!
+      description: Credenciales para autenticación de usuario
+    BiometriaDesafioRequest:
+      required:
+      - tipoAutenticador
+      type: object
+      properties:
+        tipoAutenticador:
+          pattern: ^(huella|rostro|platform_authenticator)$
+          type: string
+        domain:
+          type: string
+    BiometriaDesafioResponse:
+      type: object
+      properties:
+        challenge:
+          type: string
+        rpId:
+          type: string
+        userId:
+          type: string
+        algoritmosPermitidos:
+          type: array
+          items:
+            type: string
+        timeout:
+          type: integer
+          format: int32
+    BiometriaConfirmarRequest:
+      required:
+      - attestationObject
+      - challenge
+      - clavePublica
+      - clientDataJSON
+      - credentialId
+      type: object
+      properties:
+        challenge:
+          type: string
+        credentialId:
+          type: string
+        clavePublica:
+          type: string
+        attestationObject:
+          type: string
+        clientDataJSON:
+          type: string
+        tipoAutenticador:
+          type: string
+        dispositivo:
+          type: string
+    CredencialRegistradaResponse:
+      type: object
+      properties:
+        credentialId:
+          type: string
+        tipoAutenticador:
+          type: string
+        dispositivo:
+          type: string
+        registradoEn:
+          type: string
+          format: date-time
+    BiometriaLoginValidarRequest:
+      required:
+      - authenticatorData
+      - challenge
+      - clientDataJSON
+      - credentialId
+      - firma
+      type: object
+      properties:
+        credentialId:
+          type: string
+        challenge:
+          type: string
+        firma:
+          type: string
+        authenticatorData:
+          type: string
+        clientDataJSON:
+          type: string
+    BiometriaLoginDesafioRequest:
+      required:
+      - correo
+      type: object
+      properties:
+        correo:
+          type: string
+    BiometriaLoginDesafioResponse:
+      type: object
+      properties:
+        challenge:
+          type: string
+        allowCredentials:
+          type: array
+          items:
+            $ref: '#/components/schemas/CredencialInfo'
+        timeout:
+          type: integer
+          format: int32
+    CredencialInfo:
+      type: object
+      properties:
+        credentialId:
+          type: string
+        tipo:
+          type: string
+    ApiResponseArchivoResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indica si la operación fue exitosa
+          example: true
+        data:
+          $ref: '#/components/schemas/ArchivoResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      description: Envoltorio estándar de respuesta de la API VotaSegura
+    ArchivoResponse:
+      type: object
+      properties:
+        nombreOriginal:
+          type: string
+        nombreArchivo:
+          type: string
+        url:
+          type: string
+        tipo:
+          type: string
+        tamanioBytes:
+          type: integer
+          format: int64
+      description: Datos de respuesta (tipo varía según el endpoint)
+    Meta:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Versión de la API
+          example: 1.0.0
+        timestamp:
+          type: string
+          description: Fecha y hora de la respuesta en ISO 8601
+          format: date-time
+      description: Metadatos de la respuesta de la API
+    CambiarEstadoRequest:
+      required:
+      - estado
+      type: object
+      properties:
+        estado:
+          type: string
+    HistorialVotoResponse:
+      type: object
+      properties:
+        eleccionId:
+          type: string
+        eleccionTitulo:
+          type: string
+        grupoNombre:
+          type: string
+        grupoId:
+          type: string
+        codigoRecibo:
+          type: string
+        emitidoEn:
+          type: string
+          format: date-time
+    ResultadosEleccionResponse:
+      type: object
+      properties:
+        eleccionId:
+          type: string
+          description: Identificador único de la elección
+          example: elec-1a2b3c4d-5e6f
+        titulo:
+          type: string
+          description: Título de la elección
+          example: Elección de Presidente 2024
+        grupoNombre:
+          type: string
+          description: Nombre del grupo donde se realizó la elección
+          example: Consejo Estudiantil 2024
+        estado:
+          type: string
+          description: Estado de la elección
+          example: CERRADA
+          enum:
+          - PENDIENTE
+          - ACTIVA
+          - CERRADA
+        totalVotos:
+          type: integer
+          description: Total de votos emitidos en la elección
+          format: int64
+          example: 87
+        ganador:
+          $ref: '#/components/schemas/CandidatoResponse'
+        empate:
+          type: boolean
+          description: Indica si la elección terminó en empate
+          example: false
+        empatados:
+          type: array
+          description: Lista de candidatos empatados (solo se llena cuando empate=true)
+          items:
+            $ref: '#/components/schemas/CandidatoResponse'
+        candidatos:
+          type: array
+          description: Lista completa de candidatos con sus resultados
+          items:
+            $ref: '#/components/schemas/CandidatoResponse'
+      description: Resultados finales de una elección cerrada
+    ApiResponseString:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Indica si la operación fue exitosa
+          example: true
+        data:
+          type: string
+          description: Datos de respuesta (tipo varía según el endpoint)
+        meta:
+          $ref: '#/components/schemas/Meta'
+      description: Envoltorio estándar de respuesta de la API VotaSegura
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: Ingrese el token JWT obtenido en el endpoint /api/v1/auth/login
+      scheme: bearer
+      bearerFormat: JWT

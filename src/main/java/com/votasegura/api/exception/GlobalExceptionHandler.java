@@ -1,5 +1,6 @@
 package com.votasegura.api.exception;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -14,6 +15,28 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
+/**
+ * Manejador global de excepciones.
+ * Todas las respuestas de error siguen el estándar RFC 7807 (ProblemDetail).
+ * Estructura de error estandarizada:
+ * <pre>
+ * {
+ *   "type": "https://api.votasegura.com/errors/<slug>",
+ *   "title": "Descripción del error",
+ *   "status": 4xx | 5xx,
+ *   "detail": "Mensaje descriptivo del error",
+ *   "code": "CODIGO_ERROR",
+ *   "timestamp": "2024-11-17T12:00:00"
+ * }
+ * </pre>
+ * Códigos de error manejados:
+ * 400 INVALID_INPUT - Validación de campos fallida
+ * 403 CUENTA_DESACTIVADA - Usuario desactivado en el sistema
+ * 409 DATA_INTEGRITY_CONFLICT - Voto duplicado o correo ya registrado
+ * 413 PAYLOAD_TOO_LARGE - Archivo supera 10 MB
+ * 500 INTERNAL_SERVER_ERROR - Error interno no controlado
+ */
+@Hidden
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
